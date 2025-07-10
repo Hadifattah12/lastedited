@@ -1,0 +1,51 @@
+{
+  "welcome": "Welcome to ft_transcendence!",
+  "hello": "Hello",
+  "logout": "Logout",
+  "profile": "Profile",
+  "tournament": "Tournament Mode",
+  "joinTournament": "Join or create a tournament and compete with others.",
+   "startMatch": "Start Match",
+    "enterSecondPlayer": "Enter the name of Player 2",
+  "player2Name": "Player 2 name",
+  "startGame": "Start Game",
+  "cancel": "Cancel",
+  "4players": "4 Players",
+  "8players": "8 Players",
+
+
+  "tournamentSetup": "Tournament Setup",
+  "selectPlayers": "Select number of players:",
+  "continue": "Continue",
+  "enterAliases": "Enter player aliases:",
+  "emptyAliasError": "⚠️ Player aliases cannot be empty.",
+  "noLetterAliasError": "⚠️ Aliases must include at least one letter.",
+  "shortAliasError": "⚠️ Each alias must be at least 6 characters long.",
+  "duplicateAliasError": "⚠️ Player aliases must be unique.",
+  "startTournament": "Start Tournament",
+  "roundMatches": "Round {{round}} Matches:",
+  "failedToStart": "⚠️ Failed to start the tournament.",
+  "showWinner": "🎉 Show Tournament Winner",
+  "champion": "🏆 Tournament Champion: {{winner}}",
+  "returnHome": "🏠 Return Home",
+  "newTournament": "🔁 Generate New Tournament",
+  "nextRound": "➡️ Generate Next Round",
+
+
+
+  "title": "🏓 Pong Game",
+  "ready": "Ready to Play?",
+  "pressSpace": "Press SPACE to begin!",
+  "start": "🎮 Start Game",
+  "pause": "⏸️ Pause",
+  "reset": "🔄 Reset",
+  "home": "🏠 Back to Home",
+  "vs": "VS",
+  "gamePaused": "Game Paused",
+  "resett": "Reset",
+  "getReady": "Get Ready",
+
+  "GAME_WIN_MESSAGE": "🏆 Congratulations {{winner}}! You won the match!",
+  "GAME_WIN_OVERLAY": "🎉 {{winner}} Wins! Final Score: {{score1}} - {{score2}}"
+
+}

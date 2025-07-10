@@ -1,0 +1,153 @@
+/* ------------------ Layout shell ------------------ */
+.remote-setup-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+  font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #f1f1f1;
+}
+
+.remote-setup-container {
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  padding: 32px 40px;
+  max-width: 440px;
+  width: 90%;
+  text-align: center;
+}
+
+/* ------------------ Headings & Divider ------------- */
+.remote-setup-container h1 {
+  font-size: 1.8rem;
+  margin-bottom: 0.4rem;
+}
+
+.remote-setup-container p {
+  font-size: 0.95rem;
+  margin-bottom: 1.5rem;
+  opacity: 0.85;
+}
+
+.divider {
+  margin: 20px 0;
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+  opacity: 0.65;
+}
+
+/* ------------------ Buttons ------------------------ */
+.action-btn,
+.start-game-btn,
+.back-btn,
+.copy-btn {
+  cursor: pointer;
+  border: none;
+  border-radius: 28px;
+  padding: 10px 22px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: transform 0.15s, box-shadow 0.15s;
+  color:#0b0b0b;
+}
+
+.action-btn:hover,
+.start-game-btn:hover,
+.back-btn:hover,
+.copy-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,255,136,0.25);
+}
+
+.back-btn {
+  margin-top: 30px;
+  background: rgba(255,255,255,0.07);
+  color: #f1f1f1;
+}
+
+.copy-btn {
+  padding: 6px 10px;
+  margin-left: 8px;
+  font-size: 0.9rem;
+}
+
+/* ------------------ Code & Inputs ------------------ */
+.code-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.code-input,
+.player-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+  color:black;
+  font-size: 1rem;
+  text-align: center;
+  outline: none;
+}
+
+.code-input {
+  font-weight: 700;
+  letter-spacing: 3px;
+}
+
+/* ------------------ Remote buttons group ----------- */
+.remote-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ------------------ Status messages ---------------- */
+.status-message {
+  margin-top: 18px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  display: inline-block;
+}
+
+.status-message.info    { background: rgba(0,123,255,0.14); }
+.status-message.success { background: rgba(40,167,69,0.16); }
+.status-message.error   { background: rgba(220,53,69,0.16); }
+
+.status-message.success::before,
+.status-message.error::before,
+.status-message.info::before {
+  content: \"ℹ️\";
+  margin-right: 6px;
+}
+
+/* ------------------ Waiting spinner ---------------- */
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 4px solid rgba(255,255,255,0.2);
+  border-top-color: #00ff88;
+  border-radius: 50%;
+  margin: 14px auto 4px;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ------------------ Responsive tweaks -------------- */
+@media (max-width: 480px) {
+  .remote-setup-container {
+    padding: 28px 24px;
+  }
+  .remote-setup-container h1 {
+    font-size: 1.5rem;
+  }
+}

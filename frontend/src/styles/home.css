@@ -1,0 +1,318 @@
+/* Global wrapper */
+.home-wrapper {
+  width: 100vw;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: url(../photo/back.png) center/cover no-repeat;
+}
+
+/* Title */
+.home-title {
+  color: white;
+  font-size: 2rem;
+}
+
+/* Container */
+.home-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+}
+
+/* Header */
+.home-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+/* Welcome message */
+.welcome-msg {
+  color: white;
+  font-size: 1.4rem;
+  text-align: center;
+  margin: 1rem auto;
+}
+
+/* Header right */
+.header-right {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+/* Dropdown toggle */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-toggle {
+  background-color: transparent;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 0.4rem 1rem;
+  font-size: 1rem;
+  font-weight: 500;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.dropdown-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #facc15;
+  border-color: #facc15;
+}
+
+/* Language selector */
+.language-selector {
+  background-color: transparent;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 0.4rem 1rem;
+  font-size: 1rem;
+  color: white;
+  cursor: pointer;
+}
+
+.language-selector option {
+  background-color: #333;
+  color: white;
+}
+
+/* Dropdown menu (controlled by JS .show class) */
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  border: 1px solid #444;
+  border-radius: 5px;
+  z-index: 9999;
+  padding: 0.5rem 0;
+  min-width: 140px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  display: none;
+}
+
+.dropdown-menu.show {
+  display: block;
+}
+
+.dropdown-item {
+  display: block;
+  background: none;
+  border: none;
+  padding: 0.5rem 1.5rem;
+  color: #fff;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.dropdown-item:hover {
+  background-color: #444;
+}
+
+/* Main area */
+.home-main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 1rem;
+}
+
+/* Game cards container - 2x2 grid layout */
+.game-mode-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+  justify-content: center;
+  width: 100%;
+  max-width: 800px;
+}
+
+/* Game card styling */
+.game-card {
+  background-color: rgba(192, 144, 15, 0.19);
+  backdrop-filter: blur(10px);
+  width: 100%;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: center;
+  border-radius: 20px;
+  padding: 1.5rem;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s;
+}
+
+.game-card:hover {
+  transform: translateY(-4px);
+}
+
+.game-card h2 {
+  font-size: 1.4rem;
+  color: white;
+  margin-bottom: 1rem;
+}
+
+.game-card p {
+  font-size: 1rem;
+  color: white;
+  margin-bottom: 1rem;
+}
+
+/* Buttons - All with login button styling */
+.action-btn,
+.start-game-btn,
+.cancel-btn {
+  padding: 0.75rem 1rem;
+  background: linear-gradient(45deg, #e91e63, #ffeb3b);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.action-btn:hover,
+.start-game-btn:hover,
+.cancel-btn:hover {
+  background: linear-gradient(45deg, #e91e63, #ffeb3b);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Inputs */
+.player-input {
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+/* Forms */
+.player-form,
+#aiLevelForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  color: white;
+  font-weight: 500;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .home-title {
+    font-size: 1.6rem;
+    text-align: center;
+    width: 100%;
+  }
+
+  .header-right {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .home-header {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  /* Switch to single column on tablets */
+  .game-mode-cards {
+    grid-template-columns: 1fr;
+    max-width: 400px;
+  }
+
+  .game-card {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .home-container {
+    padding: 1rem;
+  }
+
+  .home-title {
+    font-size: 1.4rem;
+  }
+
+  .welcome-msg {
+    font-size: 1.2rem;
+  }
+
+  .action-btn,
+  .start-game-btn,
+  .cancel-btn {
+    font-size: 0.95rem;
+    padding: 0.6rem 0.9rem;
+  }
+
+  .game-mode-cards {
+    gap: 1.5rem;
+  }
+
+  .game-card {
+    padding: 1rem;
+    min-height: 280px;
+  }
+
+  .game-card h2 {
+    font-size: 1.2rem;
+  }
+
+  .game-card p {
+    font-size: 0.9rem;
+  }
+
+  .form-buttons {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 320px) {
+  .home-title {
+    font-size: 1.2rem;
+  }
+
+  .welcome-msg {
+    font-size: 1rem;
+  }
+
+  .game-card {
+    padding: 0.8rem;
+    min-height: 250px;
+  }
+}

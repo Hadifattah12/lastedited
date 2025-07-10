@@ -8,34 +8,28 @@ import { apiFetch }      from '../utils/api';
 /* ------------------------------------------------------------------ */
 async function safeJson(res: Response) {
   const txt = await res.text();
-  if (!txt) return null;
-  try { return JSON.parse(txt); } catch { return null; }
+  return txt ? JSON.parse(txt) : null;
 }
 
 function redirectToLogin() {
   alert('Session expired — please log in again.');
   localStorage.removeItem('user');
   location.hash = '#/login';
-  throw new Error('401 unauthorised');       // abort further processing
+  throw new Error('401 unauthorised');
 }
 
 /* ------------------------------------------------------------------ */
 /* types                                                              */
 /* ------------------------------------------------------------------ */
-interface Friend {
-  id: number;
-  name: string;
-  avatar: string;
-  online: boolean;
-}
+interface Friend { id:number; name:string; avatar:string; online:boolean; }
 
 /* ------------------------------------------------------------------ */
 /* modal-style injector                                               */
 /* ------------------------------------------------------------------ */
 function injectModalStyles() {
   if (document.getElementById('friend-modal-style')) return;
-  const style       = document.createElement('style');
-  style.id          = 'friend-modal-style';
+  const style = document.createElement('style');
+  style.id = 'friend-modal-style';
   style.textContent = `
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);
       display:flex;align-items:center;justify-content:center;z-index:10000;}
@@ -60,7 +54,8 @@ async function showFriendProfile(friend: Friend) {
                    { className: 'modal-overlay' });
   const modal   = Object.assign(document.createElement('div'),
                    { className: 'modal', innerHTML: '<p>Loading…</p>' });
-  overlay.appendChild(modal); document.body.appendChild(overlay);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 
   try {
@@ -92,7 +87,7 @@ async function showFriendProfile(friend: Friend) {
         <ul class="friend-history">${historyHtml || '<li>No matches yet.</li>'}</ul>
       </div>`;
     modal.querySelector('.close-btn')!.addEventListener('click', () => overlay.remove());
-  } catch (err) {
+  } catch {
     modal.innerHTML = `<p style="color:red;">Failed to load profile.</p>`;
   }
 }
@@ -101,9 +96,9 @@ async function showFriendProfile(friend: Friend) {
 /* main component                                                     */
 /* ------------------------------------------------------------------ */
 export async function renderProfile(): Promise<HTMLElement> {
-  const userRaw = localStorage.getItem('user');
-  if (!userRaw) { redirectToLogin(); }
-  const user = JSON.parse(userRaw!);
+  const raw = localStorage.getItem('user');
+  if (!raw) redirectToLogin();
+  const user = JSON.parse(raw!);
 
   const container = document.createElement('div');
   container.className = 'profile-wrapper';
@@ -136,7 +131,7 @@ export async function renderProfile(): Promise<HTMLElement> {
         <button id="saveProfileBtn">💾 Save Changes</button>
       </div>
 
-      <!-- 2-FA toggle -->
+      <!-- 2-FA -->
       <div class="twofa-section">
         <h2>🔐 Two-Factor Authentication</h2>
         <p>Secure your account with an e-mail code on login.</p>
@@ -150,7 +145,7 @@ export async function renderProfile(): Promise<HTMLElement> {
       <!-- stats -->
       <div class="stats-section">
         <h3>🏆 Stats</h3>
-        <p>Wins: <span id="wins">--</span></p>
+        <p>Wins:   <span id="wins">--</span></p>
         <p>Losses: <span id="losses">--</span></p>
       </div>
 
@@ -176,26 +171,20 @@ export async function renderProfile(): Promise<HTMLElement> {
 
       <!-- incoming requests -->
       <div class="pending-section">
-        <h3>🕓 Pending Requests (Incoming)</h3>
+        <h3>🕓 Pending Requests</h3>
         <ul id="pendingList"></ul>
-      </div>
-
-      <!-- sent requests (NEW) -->
-      <div class="sent-section">
-        <h3>📤 Sent Requests</h3>
-        <ul id="sentList"></ul>
       </div>
     </div>`;
 
   /* ---------- avatar preview ---------- */
-  const avatarInput   = container.querySelector('#avatarInput')   as HTMLInputElement;
+  const avatarInput = container.querySelector('#avatarInput') as HTMLInputElement;
   const avatarPreview = container.querySelector('#avatarPreview') as HTMLImageElement;
   avatarInput.addEventListener('change', () => {
     const f = avatarInput.files?.[0];
     if (f) avatarPreview.src = URL.createObjectURL(f);
   });
 
-  /* ---------- save profile ------------ */
+  /* ---------- save profile ---------- */
   container.querySelector('#saveProfileBtn')!.addEventListener('click', async () => {
     const name  = (container.querySelector('#nameInput')  as HTMLInputElement).value.trim();
     const email = (container.querySelector('#emailInput') as HTMLInputElement).value.trim();
@@ -212,29 +201,38 @@ export async function renderProfile(): Promise<HTMLElement> {
     if (r.status === 401) return redirectToLogin();
     const j = await safeJson(r);
     if (!r.ok) return alert(j?.error || 'Update failed');
-    localStorage.setItem('user', JSON.stringify(j.user));
+
+    localStorage.setItem('user', JSON.stringify(j.user));   // persist changes
     alert('Profile updated!'); location.reload();
   });
 
-  /* ---------- 2-FA toggle ------------- */
+  /* ---------- 2-FA toggle ---------- */
   const toggleBtn = container.querySelector('#toggle2FA') as HTMLButtonElement;
+
   toggleBtn.addEventListener('click', async () => {
-    const enabled = toggleBtn.dataset.enabled === 'true';
-    if (!confirm(enabled ? 'Disable 2FA?' : 'Enable 2FA?')) return;
+    const enabledNow = toggleBtn.dataset.enabled === 'true';
+    if (!confirm(enabledNow ? 'Disable 2FA?' : 'Enable 2FA?')) return;
 
     const r = await apiFetch('/api/profile/2fa', {
-      method:'PATCH',
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify({ enable2FA: !enabled })
+      method : 'PATCH',
+      headers: { 'Content-Type':'application/json' },
+      body   : JSON.stringify({ enable2FA: !enabledNow })
     });
     if (r.status === 401) return redirectToLogin();
     const j = await safeJson(r);
     if (!r.ok) return alert(j?.error || 'Error toggling 2FA');
 
-    toggleBtn.dataset.enabled = String(!enabled);
-    toggleBtn.textContent     = !enabled ? '❌ Disable 2FA' : '✅ Enable 2FA';
-    toggleBtn.classList.toggle('enable', !enabled);
-    toggleBtn.classList.toggle('disable', enabled);
+    /* ---- persist new 2FA state locally ---- */
+    const stored = JSON.parse(localStorage.getItem('user') || '{}');
+    stored.is2FAEnabled = !enabledNow;
+    localStorage.setItem('user', JSON.stringify(stored));
+
+    /* ---- immediate UI update ---- */
+    const enabledNew = !enabledNow;
+    toggleBtn.dataset.enabled = String(enabledNew);
+    toggleBtn.textContent     = enabledNew ? '❌ Disable 2FA' : '✅ Enable 2FA';
+    toggleBtn.classList.remove('enable','disable');
+    toggleBtn.classList.add(enabledNew ? 'disable' : 'enable');
   });
 
   /* ---------- loaders (friends / requests / matches / stats) -------- */
@@ -255,18 +253,17 @@ export async function renderProfile(): Promise<HTMLElement> {
         <button class="remove-friend-btn" data-id="${fr.id}">❌ Remove</button>`;
       list.appendChild(li);
 
-      li.querySelector('.friend-name')!.addEventListener('click',
-        () => showFriendProfile(fr as Friend));
+      li.querySelector('.friend-name')!
+        .addEventListener('click', () => showFriendProfile(fr as Friend));
 
-      li.querySelector('.remove-friend-btn')!.addEventListener('click', async ev => {
-        ev.stopPropagation();
-        if (!confirm(`Remove ${fr.name}?`)) return;
-        const r2 = await apiFetch(`/api/friends/${fr.id}`, { method:'DELETE' });
-        if (r2.status === 401) return redirectToLogin();
-        const j = await safeJson(r2);
-        if (!r2.ok) return alert(j?.error || 'Remove failed');
-        loadFriends(); loadSentRequests();
-      });
+      li.querySelector('.remove-friend-btn')!
+        .addEventListener('click', async ev => {
+          ev.stopPropagation();
+          if (!confirm(`Remove ${fr.name}?`)) return;
+          const r2 = await apiFetch(`/api/friends/${fr.id}`, { method:'DELETE' });
+          if (r2.status === 401) return redirectToLogin();
+          loadFriends(); loadPendingRequests();
+        });
     });
   }
 
@@ -283,39 +280,23 @@ export async function renderProfile(): Promise<HTMLElement> {
       li.innerHTML = `
         <img src="${resolveAvatar(rq.avatar)}" class="avatar-mini">
         <span class="friend-name">${rq.name}</span>
-        <span class="request-text">wants to be friends</span>
         <button class="approve-btn" data-id="${rq.id}">✅</button>
         <button class="reject-btn"  data-id="${rq.id}">❌</button>`;
       list.appendChild(li);
 
-      li.querySelector('.approve-btn')!.addEventListener('click', async () => {
-        const r2 = await apiFetch(`/api/friends/approve/${rq.id}`, { method:'PATCH' });
-        if (r2.status === 401) return redirectToLogin();
-        loadPendingRequests(); loadFriends(); loadSentRequests();
-      });
-      li.querySelector('.reject-btn')!.addEventListener('click', async () => {
-        const r2 = await apiFetch(`/api/friends/reject/${rq.id}`, { method:'PATCH' });
-        if (r2.status === 401) return redirectToLogin();
-        loadPendingRequests();
-      });
-    });
-  }
+      li.querySelector('.approve-btn')!
+        .addEventListener('click', async () => {
+          const r2 = await apiFetch(`/api/friends/approve/${rq.id}`, { method:'PATCH' });
+          if (r2.status === 401) return redirectToLogin();
+          loadPendingRequests(); loadFriends();
+        });
 
-  async function loadSentRequests() {
-    const r = await apiFetch('/api/friends/requests/sent');
-    if (r.status === 401) return redirectToLogin();
-    const arr: any[] = (await safeJson(r)) || [];
-    if (!Array.isArray(arr)) return;
-
-    const list = container.querySelector('#sentList')!;
-    list.innerHTML = '';
-    arr.forEach(rq => {
-      const li = document.createElement('li');
-      li.innerHTML = `
-        <img src="${resolveAvatar(rq.avatar)}" class="avatar-mini">
-        <span class="friend-name">${rq.name}</span>
-        <span class="request-text">⏳ awaiting approval</span>`;
-      list.appendChild(li);
+      li.querySelector('.reject-btn')!
+        .addEventListener('click', async () => {
+          const r2 = await apiFetch(`/api/friends/reject/${rq.id}`, { method:'PATCH' });
+          if (r2.status === 401) return redirectToLogin();
+          loadPendingRequests();
+        });
     });
   }
 
@@ -331,10 +312,10 @@ export async function renderProfile(): Promise<HTMLElement> {
       const win      = m.winner === user.name;
       const opponent = m.player1 === user.name ? m.player2 : m.player1;
       const li = document.createElement('li');
+      li.className = win ? 'match-item win' : 'match-item loss';
       li.innerHTML = `<strong>${new Date(m.date).toLocaleString()}</strong> vs
         ${opponent} – ${win ? '🏆 Win' : '❌ Loss'}
         (${m.score1}-${m.score2})`;
-      li.className = win ? 'match-item win' : 'match-item loss';
       list.appendChild(li);
     });
   }
@@ -385,17 +366,16 @@ export async function renderProfile(): Promise<HTMLElement> {
       li.querySelector('.add-friend-btn')?.addEventListener('click', async () => {
         const r2 = await apiFetch(`/api/friends/${u.id}`, { method:'POST' });
         if (r2.status === 401) return redirectToLogin();
-        searchBtn.click(); loadSentRequests();
+        searchBtn.click(); loadPendingRequests();
       });
     });
   });
   searchInput.addEventListener('keypress', e => { if (e.key==='Enter') searchBtn.click(); });
 
-  /* ---------- initial loads ---------- */
+  /* ---------- initial parallel loads ---------- */
   await Promise.all([
     loadFriends(),
     loadPendingRequests(),
-    loadSentRequests(),
     loadMatchHistory()
   ]);
   setTimeout(calcStats, 0);

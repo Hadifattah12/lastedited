@@ -1,9 +1,10 @@
+// src/pages/profile.ts
 import '../styles/profile.css';
 import { resolveAvatar } from '../utils/resolveAvatar';
 import { apiFetch }      from '../utils/api';
 
 /* ------------------------------------------------------------------ */
-/* helper: safely parse JSON (survives 204 / empty body)              */
+/* helpers                                                            */
 /* ------------------------------------------------------------------ */
 async function safeJson(res: Response) {
   const txt = await res.text();
@@ -11,8 +12,15 @@ async function safeJson(res: Response) {
   try { return JSON.parse(txt); } catch { return null; }
 }
 
+function redirectToLogin() {
+  alert('Session expired — please log in again.');
+  localStorage.removeItem('user');
+  location.hash = '#/login';
+  throw new Error('401 unauthorised');       // abort further processing
+}
+
 /* ------------------------------------------------------------------ */
-/* additional types                                                   */
+/* types                                                              */
 /* ------------------------------------------------------------------ */
 interface Friend {
   id: number;
@@ -22,97 +30,95 @@ interface Friend {
 }
 
 /* ------------------------------------------------------------------ */
-/* modal-styling helper (injected once)                               */
+/* modal-style injector                                               */
 /* ------------------------------------------------------------------ */
 function injectModalStyles() {
-  if (document.getElementById('friend-modal-style')) return;    // already there
-  const style = document.createElement('style');
-  style.id     = 'friend-modal-style';
+  if (document.getElementById('friend-modal-style')) return;
+  const style       = document.createElement('style');
+  style.id          = 'friend-modal-style';
   style.textContent = `
-    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:10000;}
-    .modal{background:#fff;border-radius:8px;max-width:500px;width:90%;max-height:90vh;overflow:auto;padding:24px 32px;position:relative;box-shadow:0 10px 25px rgba(0,0,0,.25);}  
-    .close-btn{position:absolute;top:8px;right:12px;font-size:24px;line-height:1;background:none;border:none;cursor:pointer;}
-    .avatar-large{width:120px;height:120px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 12px;}
-    .friend-history{margin-top:12px;padding-left:22px;}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);
+      display:flex;align-items:center;justify-content:center;z-index:10000;}
+    .modal{background:#fff;border-radius:8px;max-width:500px;width:90%;
+      max-height:90vh;overflow:auto;padding:24px 32px;position:relative;
+      box-shadow:0 10px 25px rgba(0,0,0,.25);}
+    .close-btn{position:absolute;top:8px;right:12px;font-size:24px;
+      background:none;border:none;cursor:pointer;}
+    .avatar-large{width:120px;height:120px;border-radius:50%;object-fit:cover;
+      display:block;margin:0 auto 12px;}
     .friend-name{cursor:pointer;text-decoration:underline;}
   `;
   document.head.appendChild(style);
 }
 
 /* ------------------------------------------------------------------ */
-/* popup: detailed friend profile                                     */
+/* friend-profile popup                                               */
 /* ------------------------------------------------------------------ */
 async function showFriendProfile(friend: Friend) {
   injectModalStyles();
-
-  /* overlay + modal skeleton */
-  const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
-  const modal   = document.createElement('div'); modal.className   = 'modal';
-  modal.innerHTML = '<p>Loading…</p>';
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
-  /* close on [×] or overlay-click */
+  const overlay = Object.assign(document.createElement('div'),
+                   { className: 'modal-overlay' });
+  const modal   = Object.assign(document.createElement('div'),
+                   { className: 'modal', innerHTML: '<p>Loading…</p>' });
+  overlay.appendChild(modal); document.body.appendChild(overlay);
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 
   try {
-    /* fetch match history to compute wins / losses */
-    const r   = await apiFetch(`/api/matches/${encodeURIComponent(friend.name)}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    });
-    const matches = await safeJson(r) || [];
+    const r = await apiFetch(`/api/matches/${encodeURIComponent(friend.name)}`);
+    if (r.status === 401) return redirectToLogin();
+    const matches: any[] = (await safeJson(r)) || [];
 
     let wins = 0, losses = 0;
-    matches.forEach((m:any) => {
+    matches.forEach(m => {
       if (m.winner === friend.name) wins++;
       else if (m.player1 === friend.name || m.player2 === friend.name) losses++;
     });
 
-    const historyHtml = matches.slice(0, 10).map((m:any) => {
+    const historyHtml = matches.slice(0, 10).map(m => {
       const opponent = m.player1 === friend.name ? m.player2 : m.player1;
       const win      = m.winner === friend.name;
-      return `<li><strong>${new Date(m.date).toLocaleString()}</strong> vs ${opponent} – ${win ? '🏆 Win' : '❌ Loss'} (${m.score1} - ${m.score2})</li>`;
+      return `<li><strong>${new Date(m.date).toLocaleString()}</strong> vs
+              ${opponent} – ${win ? '🏆 Win' : '❌ Loss'} (${m.score1}-${m.score2})</li>`;
     }).join('');
 
     modal.innerHTML = `
       <button class="close-btn">×</button>
       <div class="friend-profile">
-        <img src="${resolveAvatar(friend.avatar)}" class="avatar-large" alt="avatar of ${friend.name}">
+        <img src="${resolveAvatar(friend.avatar)}" class="avatar-large">
         <h2 style="text-align:center;">${friend.name} ${friend.online ? '🟢' : '🔘'}</h2>
-        <p style="text-align:center;">Wins: <strong>${wins}</strong> &nbsp;|&nbsp; Losses: <strong>${losses}</strong></p>
+        <p style="text-align:center;">Wins <strong>${wins}</strong> |
+           Losses <strong>${losses}</strong></p>
         <h3>Recent Matches</h3>
         <ul class="friend-history">${historyHtml || '<li>No matches yet.</li>'}</ul>
       </div>`;
-
     modal.querySelector('.close-btn')!.addEventListener('click', () => overlay.remove());
-  } catch (e:any) {
-    modal.innerHTML = `<p style="color:red;">${e.message || 'Failed to load profile.'}</p>`;
+  } catch (err) {
+    modal.innerHTML = `<p style="color:red;">Failed to load profile.</p>`;
   }
 }
 
 /* ------------------------------------------------------------------ */
-/* main export                                                        */
+/* main component                                                     */
 /* ------------------------------------------------------------------ */
 export async function renderProfile(): Promise<HTMLElement> {
-  const stored = localStorage.getItem('user');
-  const user   = stored ? JSON.parse(stored) : null;
+  const userRaw = localStorage.getItem('user');
+  if (!userRaw) { redirectToLogin(); }
+  const user = JSON.parse(userRaw!);
 
   const container = document.createElement('div');
   container.className = 'profile-wrapper';
   document.body.className = '';
 
-  /* ---------------------------------------------------------------- */
-  /* markup                                                           */
-  /* ---------------------------------------------------------------- */
+  /* ---------- markup ---------- */
   container.innerHTML = `
-    <button class="back-arrow" onclick="location.hash='/home'">⬅ Home</button>
+    <button class="back-arrow" onclick="location.hash='#/home'">⬅ Home</button>
 
     <div class="profile-container">
       <h1 class="profile-title">👤 My Profile</h1>
 
       <!-- avatar -->
       <div class="avatar-section">
-        <img  id="avatarPreview" class="avatar-img"
-              src="${resolveAvatar(user?.avatar)}" alt="Avatar">
+        <img id="avatarPreview" class="avatar-img" src="${resolveAvatar(user.avatar)}" alt="avatar">
         <input type="file" id="avatarInput" accept="image/*">
       </div>
 
@@ -120,9 +126,9 @@ export async function renderProfile(): Promise<HTMLElement> {
       <div class="info-section">
         <h2>📝 Update Info</h2>
         <label>Display Name:</label>
-        <input id="nameInput"  type="text"  value="${user?.name  ?? ''}">
+        <input id="nameInput"  type="text"  value="${user.name}">
         <label>Email:</label>
-        <input id="emailInput" type="email" value="${user?.email ?? ''}">
+        <input id="emailInput" type="email" value="${user.email}">
         <label>New Password:</label>
         <input id="passwordInput"        type="password" placeholder="New password">
         <label>Confirm Password:</label>
@@ -130,21 +136,21 @@ export async function renderProfile(): Promise<HTMLElement> {
         <button id="saveProfileBtn">💾 Save Changes</button>
       </div>
 
-      <!-- 2-FA toggle (rendered immediately) -->
+      <!-- 2-FA toggle -->
       <div class="twofa-section">
         <h2>🔐 Two-Factor Authentication</h2>
         <p>Secure your account with an e-mail code on login.</p>
         <button id="toggle2FA"
-                data-enabled="${user?.is2FAEnabled ? 'true' : 'false'}"
-                class="${user?.is2FAEnabled ? 'disable' : 'enable'}">
-          ${user?.is2FAEnabled ? '❌ Disable 2FA' : '✅ Enable 2FA'}
+                data-enabled="${user.is2FAEnabled}"
+                class="${user.is2FAEnabled ? 'disable' : 'enable'}">
+          ${user.is2FAEnabled ? '❌ Disable 2FA' : '✅ Enable 2FA'}
         </button>
       </div>
 
       <!-- stats -->
       <div class="stats-section">
         <h3>🏆 Stats</h3>
-        <p>Wins:   <span id="wins">--</span></p>
+        <p>Wins: <span id="wins">--</span></p>
         <p>Losses: <span id="losses">--</span></p>
       </div>
 
@@ -163,22 +169,25 @@ export async function renderProfile(): Promise<HTMLElement> {
       <!-- add friend -->
       <div class="add-friend-section">
         <h3>➕ Add Friend</h3>
-        <input id="searchInput" type="text" placeholder="Enter name…">
+        <input id="searchInput" placeholder="Enter name…">
         <button id="searchBtn">Search</button>
         <ul id="searchResults"></ul>
       </div>
 
-      <!-- requests -->
+      <!-- incoming requests -->
       <div class="pending-section">
         <h3>🕓 Pending Requests (Incoming)</h3>
         <ul id="pendingList"></ul>
       </div>
 
+      <!-- sent requests (NEW) -->
+      <div class="sent-section">
+        <h3>📤 Sent Requests</h3>
+        <ul id="sentList"></ul>
+      </div>
     </div>`;
 
-  /* ---------------------------------------------------------------- */
-  /* avatar preview                                                   */
-  /* ---------------------------------------------------------------- */
+  /* ---------- avatar preview ---------- */
   const avatarInput   = container.querySelector('#avatarInput')   as HTMLInputElement;
   const avatarPreview = container.querySelector('#avatarPreview') as HTMLImageElement;
   avatarInput.addEventListener('change', () => {
@@ -186,9 +195,7 @@ export async function renderProfile(): Promise<HTMLElement> {
     if (f) avatarPreview.src = URL.createObjectURL(f);
   });
 
-  /* ---------------------------------------------------------------- */
-  /* save profile                                                     */
-  /* ---------------------------------------------------------------- */
+  /* ---------- save profile ------------ */
   container.querySelector('#saveProfileBtn')!.addEventListener('click', async () => {
     const name  = (container.querySelector('#nameInput')  as HTMLInputElement).value.trim();
     const email = (container.querySelector('#emailInput') as HTMLInputElement).value.trim();
@@ -197,298 +204,194 @@ export async function renderProfile(): Promise<HTMLElement> {
     if (pw1 && pw1 !== pw2) return alert('Passwords do not match');
 
     const fd = new FormData();
-    fd.append('name',  name);
-    fd.append('email', email);
-    if (pw1)                    fd.append('password', pw1);
+    fd.append('name', name); fd.append('email', email);
+    if (pw1) fd.append('password', pw1);
     if (avatarInput.files?.[0]) fd.append('avatar', avatarInput.files[0]);
 
-    try {
-      const r = await apiFetch('/api/profile', {
-        method : 'PATCH',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        body   : fd
-      });
-      const j = await safeJson(r);
-      if (!r.ok) throw new Error(j?.error || r.statusText);
-      localStorage.setItem('user', JSON.stringify(j.user));
-      alert('Profile updated!'); location.reload();
-    } catch (e:any) { alert(e.message || 'Update failed'); }
+    const r = await apiFetch('/api/profile', { method:'PATCH', body:fd });
+    if (r.status === 401) return redirectToLogin();
+    const j = await safeJson(r);
+    if (!r.ok) return alert(j?.error || 'Update failed');
+    localStorage.setItem('user', JSON.stringify(j.user));
+    alert('Profile updated!'); location.reload();
   });
 
-  /* ---------------------------------------------------------------- */
-  /* 2-FA toggle                                                      */
-  /* ---------------------------------------------------------------- */
+  /* ---------- 2-FA toggle ------------- */
   const toggleBtn = container.querySelector('#toggle2FA') as HTMLButtonElement;
-
   toggleBtn.addEventListener('click', async () => {
     const enabled = toggleBtn.dataset.enabled === 'true';
     if (!confirm(enabled ? 'Disable 2FA?' : 'Enable 2FA?')) return;
 
-    try {
-      const r = await apiFetch('/api/profile/2fa', {
-        method : 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization : `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ enable2FA: !enabled })
-      });
-      const j = await safeJson(r);
-      if (!r.ok) throw new Error(j?.error || r.statusText);
-      alert(j?.message || '2FA updated');
+    const r = await apiFetch('/api/profile/2fa', {
+      method:'PATCH',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ enable2FA: !enabled })
+    });
+    if (r.status === 401) return redirectToLogin();
+    const j = await safeJson(r);
+    if (!r.ok) return alert(j?.error || 'Error toggling 2FA');
 
-      toggleBtn.dataset.enabled = (!enabled).toString();
-      toggleBtn.textContent     = !enabled ? '❌ Disable 2FA' : '✅ Enable 2FA';
-      toggleBtn.classList.toggle('enable',  !enabled);
-      toggleBtn.classList.toggle('disable',  enabled);
-    } catch { alert('Server error updating 2FA'); }
+    toggleBtn.dataset.enabled = String(!enabled);
+    toggleBtn.textContent     = !enabled ? '❌ Disable 2FA' : '✅ Enable 2FA';
+    toggleBtn.classList.toggle('enable', !enabled);
+    toggleBtn.classList.toggle('disable', enabled);
   });
 
-  /* background sanity-check (keep button honest) */
-  (async () => {
-    try {
-      const r = await apiFetch('/api/profile', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      const j = await safeJson(r);
-      const sEnabled = !!j?.user?.is2FAEnabled;
-      toggleBtn.dataset.enabled = sEnabled.toString();
-      toggleBtn.textContent     = sEnabled ? '❌ Disable 2FA' : '✅ Enable 2FA';
-      toggleBtn.classList.toggle('enable',  !sEnabled);
-      toggleBtn.classList.toggle('disable',  sEnabled);
-    } catch {/* ignore */ }
-  })();
-
-  /* ---------------------------------------------------------------- */
-  /* friends list                                                     */
-  /* ---------------------------------------------------------------- */
+  /* ---------- loaders (friends / requests / matches / stats) -------- */
   async function loadFriends() {
-    try {
-      const r   = await apiFetch('/api/friends', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    const r = await apiFetch('/api/friends');
+    if (r.status === 401) return redirectToLogin();
+    const arr: any[] = (await safeJson(r)) || [];
+    if (!Array.isArray(arr)) return;
+
+    const list = container.querySelector('#friendList')!;
+    list.innerHTML = '';
+    arr.forEach(fr => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <img src="${resolveAvatar(fr.avatar)}" class="avatar-mini">
+        <span class="friend-name">${fr.name}</span>
+        <span class="online-indicator">${fr.online ? '🟢' : '🔘'}</span>
+        <button class="remove-friend-btn" data-id="${fr.id}">❌ Remove</button>`;
+      list.appendChild(li);
+
+      li.querySelector('.friend-name')!.addEventListener('click',
+        () => showFriendProfile(fr as Friend));
+
+      li.querySelector('.remove-friend-btn')!.addEventListener('click', async ev => {
+        ev.stopPropagation();
+        if (!confirm(`Remove ${fr.name}?`)) return;
+        const r2 = await apiFetch(`/api/friends/${fr.id}`, { method:'DELETE' });
+        if (r2.status === 401) return redirectToLogin();
+        const j = await safeJson(r2);
+        if (!r2.ok) return alert(j?.error || 'Remove failed');
+        loadFriends(); loadSentRequests();
       });
-      const arr = await safeJson(r) || [];
-      const list = container.querySelector('#friendList')!;
-      list.innerHTML = '';
-
-      arr.forEach((fr:any) => {
-        const li = document.createElement('li');
-        li.innerHTML = `
-          <img src="${resolveAvatar(fr.avatar)}" class="avatar-mini">
-          <span class="friend-name">${fr.name}</span>
-          <span class="online-indicator">${fr.online ? '🟢' : '🔘'}</span>
-          <button class="remove-friend-btn" data-id="${fr.id}">❌ Remove</button>`;
-        list.appendChild(li);
-
-        /* click-to-view popup */
-        const nameSpan = li.querySelector('.friend-name') as HTMLElement;
-        nameSpan.style.cursor = 'pointer';
-        nameSpan.addEventListener('click', () => showFriendProfile(fr as Friend));
-      });
-
-      /* remove buttons */
-      list.querySelectorAll('.remove-friend-btn').forEach(btn => {
-        btn.addEventListener('click', async (ev) => {
-          ev.stopPropagation();                      //   ← stops popup
-          const id   = (btn as HTMLButtonElement).dataset.id;
-          const name = (btn.parentElement!.querySelector('.friend-name') as HTMLElement).textContent;
-          if (!confirm(`Remove ${name}?`)) return;
-
-          try {
-            const r = await apiFetch(`/api/friends/${id}`, {
-              method : 'DELETE',
-              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-            });
-            const j = await safeJson(r);
-            if (!r.ok) throw new Error(j?.error || r.statusText);
-            alert(j?.message || 'Friend removed');
-            loadFriends(); loadSentRequests();
-          } catch { alert('Failed to remove friend'); }
-        });
-      });
-    } catch (err) { console.error('loadFriends', err); }
+    });
   }
 
-  /* incoming (pending) requests */
   async function loadPendingRequests() {
-    try {
-      const r   = await apiFetch('/api/friends/requests', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      const arr = await safeJson(r) || [];
-      const list = container.querySelector('#pendingList')!;
-      list.innerHTML = '';
+    const r = await apiFetch('/api/friends/requests');
+    if (r.status === 401) return redirectToLogin();
+    const arr: any[] = (await safeJson(r)) || [];
+    if (!Array.isArray(arr)) return;
 
-      arr.forEach((rq:any) => {
-        const li = document.createElement('li');
-        li.innerHTML = `
-          <img src="${resolveAvatar(rq.avatar)}" class="avatar-mini">
-          <span class="friend-name">${rq.name}</span>
-          <span class="request-text">wants to be friends</span>
-          <button class="approve-btn" data-id="${rq.id}">✅</button>
-          <button class="reject-btn"  data-id="${rq.id}">❌</button>`;
-        list.appendChild(li);
-      });
+    const list = container.querySelector('#pendingList')!;
+    list.innerHTML = '';
+    arr.forEach(rq => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <img src="${resolveAvatar(rq.avatar)}" class="avatar-mini">
+        <span class="friend-name">${rq.name}</span>
+        <span class="request-text">wants to be friends</span>
+        <button class="approve-btn" data-id="${rq.id}">✅</button>
+        <button class="reject-btn"  data-id="${rq.id}">❌</button>`;
+      list.appendChild(li);
 
-      list.querySelectorAll('.approve-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const id = (btn as HTMLButtonElement).dataset.id;
-          try {
-            const r = await apiFetch(`/api/friends/approve/${id}`, {
-              method : 'PATCH',
-              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-            });
-            const j = await safeJson(r);
-            alert(j?.message || 'Friend approved');
-            loadPendingRequests(); loadFriends(); loadSentRequests();
-          } catch { alert('Failed to approve'); }
-        });
+      li.querySelector('.approve-btn')!.addEventListener('click', async () => {
+        const r2 = await apiFetch(`/api/friends/approve/${rq.id}`, { method:'PATCH' });
+        if (r2.status === 401) return redirectToLogin();
+        loadPendingRequests(); loadFriends(); loadSentRequests();
       });
-
-      list.querySelectorAll('.reject-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const id = (btn as HTMLButtonElement).dataset.id;
-          try {
-            const r = await apiFetch(`/api/friends/reject/${id}`, {
-              method : 'PATCH',
-              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-            });
-            const j = await safeJson(r);
-            alert(j?.message || 'Friend rejected');
-            loadPendingRequests();
-          } catch { alert('Failed to reject'); }
-        });
+      li.querySelector('.reject-btn')!.addEventListener('click', async () => {
+        const r2 = await apiFetch(`/api/friends/reject/${rq.id}`, { method:'PATCH' });
+        if (r2.status === 401) return redirectToLogin();
+        loadPendingRequests();
       });
-    } catch (err) { console.error('loadPending', err); }
+    });
   }
 
-  /* outgoing (sent) requests */
   async function loadSentRequests() {
-    try {
-      const r   = await apiFetch('/api/friends/requests/sent', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      const arr = await safeJson(r) || [];
-      const list = container.querySelector('#sentList')!;
-      list.innerHTML = '';
+    const r = await apiFetch('/api/friends/requests/sent');
+    if (r.status === 401) return redirectToLogin();
+    const arr: any[] = (await safeJson(r)) || [];
+    if (!Array.isArray(arr)) return;
 
-      arr.forEach((rq:any) => {
-        const li = document.createElement('li');
-        li.innerHTML = `
-          <img src="${resolveAvatar(rq.avatar)}" class="avatar-mini">
-          <span class="friend-name">${rq.name}</span>
-          <span class="request-text">⏳ awaiting approval</span>`;
-        list.appendChild(li);
-      });
-    } catch (err) { console.error('loadSent', err); }
+    const list = container.querySelector('#sentList')!;
+    list.innerHTML = '';
+    arr.forEach(rq => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <img src="${resolveAvatar(rq.avatar)}" class="avatar-mini">
+        <span class="friend-name">${rq.name}</span>
+        <span class="request-text">⏳ awaiting approval</span>`;
+      list.appendChild(li);
+    });
   }
 
-  /* match history */
   async function loadMatchHistory() {
-    try {
-      const r   = await apiFetch(`/api/matches/${encodeURIComponent(user.name)}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      const arr = await safeJson(r) || [];
-      const list = container.querySelector('#matchHistoryList') as HTMLUListElement;
-      list.innerHTML = arr.length ? '' : '<li>No match history yet.</li>';
+    const r = await apiFetch(`/api/matches/${encodeURIComponent(user.name)}`);
+    if (r.status === 401) return redirectToLogin();
+    const arr: any[] = (await safeJson(r)) || [];
+    if (!Array.isArray(arr)) return;
 
-      arr.forEach((m:any) => {
-        const win      = m.winner === user.name;
-        const opponent = m.player1 === user.name ? m.player2 : m.player1;
-        const li       = document.createElement('li');
-        li.className   = 'match-item';
-        li.innerHTML   = `
-          <strong>${new Date(m.date).toLocaleString()}</strong>
-          vs <span class="opponent">${opponent}</span> –
-          <span class="${win ? 'win' : 'loss'}">${win ? '🏆 Win' : '❌ Loss'}</span>
-          (${m.score1} - ${m.score2})`;
-        list.appendChild(li);
-      });
-    } catch (err) { console.error('loadHistory', err); }
+    const list = container.querySelector('#matchHistoryList')!;
+    list.innerHTML = arr.length ? '' : '<li>No match history yet.</li>';
+    arr.forEach(m => {
+      const win      = m.winner === user.name;
+      const opponent = m.player1 === user.name ? m.player2 : m.player1;
+      const li = document.createElement('li');
+      li.innerHTML = `<strong>${new Date(m.date).toLocaleString()}</strong> vs
+        ${opponent} – ${win ? '🏆 Win' : '❌ Loss'}
+        (${m.score1}-${m.score2})`;
+      li.className = win ? 'match-item win' : 'match-item loss';
+      list.appendChild(li);
+    });
   }
 
-  /* stats */
   async function calcStats() {
-    try {
-      const r   = await apiFetch(`/api/matches/${encodeURIComponent(user.name)}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      const arr = await safeJson(r) || [];
-      let wins = 0, losses = 0;
-      arr.forEach((m:any) => {
-        if (m.winner === user.name) wins++;
-        else if (m.player1 === user.name || m.player2 === user.name) losses++;
-      });
-      (document.getElementById('wins')   as HTMLElement).textContent = wins.toString();
-      (document.getElementById('losses') as HTMLElement).textContent = losses.toString();
-    } catch (err) { console.error('calcStats', err); }
+    const r = await apiFetch(`/api/matches/${encodeURIComponent(user.name)}`);
+    if (r.status === 401) return redirectToLogin();
+    const arr: any[] = (await safeJson(r)) || [];
+    if (!Array.isArray(arr)) return;
+
+    let wins = 0, losses = 0;
+    arr.forEach(m => {
+      if (m.winner === user.name) wins++;
+      else if (m.player1 === user.name || m.player2 === user.name) losses++;
+    });
+    (container.querySelector('#wins')!   as HTMLElement).textContent = String(wins);
+    (container.querySelector('#losses')! as HTMLElement).textContent = String(losses);
   }
 
-  /* ---------------------------------------------------------------- */
-  /* friend search + add                                              */
-  /* ---------------------------------------------------------------- */
+  /* ---------- friend search ---------- */
   const searchBtn   = container.querySelector('#searchBtn')   as HTMLButtonElement;
   const searchInput = container.querySelector('#searchInput') as HTMLInputElement;
   const resultList  = container.querySelector('#searchResults') as HTMLUListElement;
 
   searchBtn.addEventListener('click', async () => {
-    const query = searchInput.value.trim();
-    if (!query) return;
+    const q = searchInput.value.trim();
+    if (!q) return;
+    const r = await apiFetch(`/api/friends/search?name=${encodeURIComponent(q)}`);
+    if (r.status === 401) return redirectToLogin();
+    const arr: any[] = (await safeJson(r)) || [];
+    if (!Array.isArray(arr)) return;
 
-    try {
-      const r   = await apiFetch(`/api/friends/search?name=${encodeURIComponent(query)}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    resultList.innerHTML = '';
+    arr.forEach(u => {
+      const li = document.createElement('li');
+      let badge = '';
+      switch (u.friendship_status) {
+        case 'friends':          badge = '<span class="status-badge friends">✅ Friends</span>'; break;
+        case 'pending_sent':     badge = '<span class="status-badge pending">⏳ Request Sent</span>'; break;
+        case 'pending_received': badge = '<span class="status-badge pending">📩 Pending Response</span>'; break;
+        default:
+          badge = `<button class="add-friend-btn" data-id="${u.id}">Add Friend</button>`;
+      }
+      li.innerHTML = `<img src="${resolveAvatar(u.avatar)}" class="avatar-mini">
+                      <span class="friend-name">${u.name}</span> ${badge}`;
+      resultList.appendChild(li);
+
+      li.querySelector('.add-friend-btn')?.addEventListener('click', async () => {
+        const r2 = await apiFetch(`/api/friends/${u.id}`, { method:'POST' });
+        if (r2.status === 401) return redirectToLogin();
+        searchBtn.click(); loadSentRequests();
       });
-      const arr = await safeJson(r) || [];
-      resultList.innerHTML = '';
-
-      arr.forEach((u:any) => {
-        const li = document.createElement('li');
-        let badge = '';
-
-        switch (u.friendship_status) {
-          case 'friends':
-            badge = `<span class="status-badge friends">✅ Friends</span>`; break;
-          case 'pending_sent':
-            badge = `<span class="status-badge pending">⏳ Request Sent</span>`; break;
-          case 'pending_received':
-            badge = `<span class="status-badge pending">📩 Pending Response</span>`; break;
-          default:
-            badge = `<button class="add-friend-btn" data-id="${u.id}">Add Friend</button>`;
-        }
-
-        li.innerHTML = `
-          <img src="${resolveAvatar(u.avatar)}" class="avatar-mini">
-          <span class="friend-name">${u.name}</span>
-          ${badge}`;
-        resultList.appendChild(li);
-      });
-
-      /* add-friend buttons */
-      resultList.querySelectorAll('.add-friend-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const id = (btn as HTMLButtonElement).dataset.id;
-          try {
-            const r = await apiFetch(`/api/friends/${id}`, {
-              method : 'POST',
-              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-            });
-            const j = await safeJson(r);
-            if (!r.ok) throw new Error(j?.error || r.statusText);
-            alert(j?.message || 'Request sent!');
-            searchBtn.click();           // refresh badges
-            loadSentRequests();
-          } catch { alert('Failed to send request'); }
-        });
-      });
-    } catch (err) { console.error('search', err); }
+    });
   });
-  searchInput.addEventListener('keypress', e => { if (e.key === 'Enter') searchBtn.click(); });
+  searchInput.addEventListener('keypress', e => { if (e.key==='Enter') searchBtn.click(); });
 
-  /* ---------------------------------------------------------------- */
-  /* initial data loads                                               */
-  /* ---------------------------------------------------------------- */
+  /* ---------- initial loads ---------- */
   await Promise.all([
     loadFriends(),
     loadPendingRequests(),

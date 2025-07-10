@@ -1,21 +1,20 @@
 // src/pages/oauth-callback.ts
 export function handleOAuthCallback(): void {
-  const hash = window.location.hash;          // "#/oauth-callback?token=…&user=…"
-  const [, query = ''] = hash.split('?');
+  // URL looks like "#/oauth-callback?user=<base64>"
+  const [, query = ''] = window.location.hash.split('?');
   const params = new URLSearchParams(query);
 
-  const token = params.get('token');
   const userB64 = params.get('user');
 
-  if (token && userB64) {
-    localStorage.setItem('token', token);
+  if (userB64) {
     try {
       const userJson = atob(userB64);
-      localStorage.setItem('user', userJson);
+      localStorage.setItem('user', userJson);    // harmless UI data only
     } catch {
       /* ignore decode errors */
     }
   }
-  // Jump to real home page (now that storage is filled)
+
+  // Cookie (access_token) was already set server-side → go to home
   window.location.replace('#/home');
 }

@@ -29,7 +29,6 @@ module.exports = function (fastify, opts, done) {
 
   // Get all matches for a user
 // GET all matches for a user
-const db = require('../db/database');
 
 // Helper to wrap db.all in a Promise
 function getMatchesForUser(name) {

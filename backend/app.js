@@ -43,6 +43,7 @@ const fastify = require('fastify')({
 
 /* ---------------------------- plugins ------------------------------ */
 const fastifyCors   = require('@fastify/cors');
+const fastifyCookie = require('@fastify/cookie');          // NEW 👈
 const fastifyJwt    = require('@fastify/jwt');
 const fastifyStatic = require('@fastify/static');
 const multipart     = require('@fastify/multipart');
@@ -62,8 +63,19 @@ fastify.register(fastifyCors, {
   allowedHeaders: ['Content-Type', 'Authorization']
 });
 
+/* ---- register cookie plugin *before* JWT so jwt can read cookies ---- */
+fastify.register(fastifyCookie, {
+  // If you ever want signed cookies, add a secret here.
+  // parseOptions lets you tweak default cookie.parse behaviour.
+});
+
+/* ---------------- JWT now uses a cookie called access_token --------- */
 fastify.register(fastifyJwt, {
-  secret: process.env.JWT_SECRET || 'forsecret'
+  secret: process.env.JWT_SECRET || 'forsecret',
+  cookie: {
+    cookieName: 'access_token',
+    signed     : false          // we didn’t sign above
+  }
 });
 
 fastify.register(multipart, {

@@ -155,7 +155,11 @@ async function routes(fastify) {
   /* ---------- logout ---------- */
   fastify.post('/logout', { preHandler: auth }, (req, reply) => {
     req.server.onlineUsers.delete(req.user.id);
-    reply.send({ message: 'Logged out successfully.' });
+
+    /* Clear the JWT cookie */
+    reply
+      .clearCookie('access_token', { path: '/' })   // <-- added
+      .send({ message: 'Logged out successfully.' });
   });
 
   /* ---------- misc routes ---------- */

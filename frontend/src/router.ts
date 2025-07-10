@@ -42,9 +42,7 @@ function getCurrentRoute(): string {
 }
 
 function isAuthenticated(): boolean {
-  const token = localStorage.getItem('token');
-  const user = localStorage.getItem('user');
-  return !!(token && user);
+  return !!localStorage.getItem('user');
 }
 
 async function navigateToRoute(path: string) {

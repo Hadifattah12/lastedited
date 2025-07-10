@@ -1,8 +1,6 @@
-// controllers/googleAuthController.js
+// controllers/googleAuthController.js – now issues JWT via HttpOnly cookie
 require('dotenv').config();
 const { OAuth2Client } = require('google-auth-library');
-const jwt    = require('jsonwebtoken');
-const crypto = require('crypto');
 const User   = require('../models/user');
 
 /* ─────────────────────────────── OAuth client ────────────────────────────── */
@@ -25,7 +23,7 @@ const googleAuth = async (req, reply) => {
       access_type : 'offline',
       prompt      : 'consent',
       scope       : scopes,
-      state       : crypto.randomBytes(16).toString('hex'),
+      state       : require('crypto').randomBytes(16).toString('hex'),
       redirect_uri: process.env.GOOGLE_REDIRECT_URI
     });
 
@@ -48,7 +46,7 @@ const googleCallback = async (req, reply) => {
       );
     }
 
-    /* ---- exchange code -> tokens ---- */
+    /* ---- exchange code → tokens ---- */
     const { tokens } = await oauth2Client.getToken({
       code,
       redirect_uri: process.env.GOOGLE_REDIRECT_URI
@@ -85,15 +83,21 @@ const googleCallback = async (req, reply) => {
       }
     }
 
-    /* ---- issue JWT ---- */
-    const token = jwt.sign({ id: user.id },
-      process.env.JWT_SECRET || 'forsecret',
-      { expiresIn: '7d' }
-    );
-    // after you create `token`
-+ req.server.onlineUsers.add(user.id);   // <── add this
+    /* ---- issue JWT cookie (15-min access token) ---- */
+    const token = req.server.jwt.sign({ id: user.id }, { expiresIn: '15m' });
 
-    /* ---- hand data to frontend via URL ---- */
+    reply.setCookie('access_token', token, {
+      httpOnly : true,
+      sameSite : 'strict',
+      secure   : true,
+      path     : '/',
+      maxAge   : 15 * 60
+    });
+
+    /* mark user online */
+    req.server.onlineUsers.add(user.id);
+
+    /* ---- hand non-sensitive user data to frontend (optional) ---- */
     const userB64 = Buffer.from(JSON.stringify({
       id   : user.id,
       name : user.name,
@@ -102,9 +106,7 @@ const googleCallback = async (req, reply) => {
       is2FAEnabled: user.is2FAEnabled || false
     })).toString('base64');
 
-    const redirectUrl =
-      `${frontendUrl}/#/oauth-callback?token=${encodeURIComponent(token)}&user=${encodeURIComponent(userB64)}`;
-
+    const redirectUrl = `${frontendUrl}/#/oauth-callback?user=${encodeURIComponent(userB64)}`;
     return reply.code(302).redirect(redirectUrl);
   } catch (err) {
     console.error('❌ Google OAuth callback error:', err);

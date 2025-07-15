@@ -2,8 +2,10 @@ services:
   app:
     build: .
     ports:
-      - "3000:3000"   # backend
-      - "5173:5173"   # frontend (vite dev server)
+      - "3000:3000"
+      - "5173:5173"
     environment:
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    volumes:
+      - ./backend/db:/app/backend/db     # <--- Add this line
     restart: unless-stopped

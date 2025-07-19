@@ -2,7 +2,7 @@
 import '../styles/profile.css';
 import { resolveAvatar } from '../utils/resolveAvatar';
 import { apiFetch } from '../utils/api';
-
+import i18next from 'i18next';
 /* ------------------------------------------------------------------ */
 /* helpers                                                            */
 /* ------------------------------------------------------------------ */
@@ -158,71 +158,75 @@ export async function renderProfile(): Promise<HTMLElement> {
   document.body.className = '';
 
   container.innerHTML = `
-    <!-- Toast container -->
-    <div id="toast" class="toast" aria-live="polite" aria-atomic="true"></div>
-
-    <button class="back-arrow" onclick="location.hash='#/home'">⬅ Home</button>
+    <button class="back-arrow" onclick="location.hash='#/home'">⬅ ${i18next.t('home')}</button>
 
     <div class="profile-container">
-      <h1 class="profile-title">👤 My Profile</h1>
+      <h1 class="profile-title">👤 ${i18next.t('myProfile')}</h1>
 
+      <!-- avatar -->
       <div class="avatar-section">
         <img id="avatarPreview" class="avatar-img" src="${resolveAvatar(user.avatar)}" alt="avatar">
         <input type="file" id="avatarInput" accept="image/*">
       </div>
 
+      <!-- editable info -->
       <div class="info-section">
-        <h2 class="section-title">📝 Update Info</h2>
-        <label>Display Name:</label>
-        <input id="nameInput" type="text" value="${user.name}">
-        <label>Email:</label>
+        <h2>📝 ${i18next.t('updateInfo')}</h2>
+        <label>${i18next.t('displayName')}</label>
+        <input id="nameInput"  type="text"  value="${user.name}">
+        <label>${i18next.t('email')}</label>
         <input id="emailInput" type="email" value="${user.email}">
-        <label>New Password:</label>
-        <input id="passwordInput" type="password" placeholder="New password">
-        <label>Confirm Password:</label>
-        <input id="confirmPasswordInput" type="password" placeholder="Confirm password">
-        <button id="saveProfileBtn" class="primary-btn">💾 Save Changes</button>
+        <label>${i18next.t('newPassword')}</label>
+        <input id="passwordInput"        type="password" placeholder="${i18next.t('newPassword')}">
+        <label>${i18next.t('confirmPassword')}</label>
+        <input id="confirmPasswordInput" type="password" placeholder="${i18next.t('confirmPassword')}">
+        <button id="saveProfileBtn">💾 ${i18next.t('saveChanges')}</button>
       </div>
 
+      <!-- 2-FA -->
       <div class="twofa-section">
-        <h2 class="section-title">🔐 Two-Factor Authentication</h2>
-        <p class="twofa-desc">Secure your account with an e-mail code on login.</p>
+        <h2>🔐 ${i18next.t('twoFA')}</h2>
+        <p>${i18next.t('twoFADesc')}</p>
         <button id="toggle2FA"
                 data-enabled="${user.is2FAEnabled}"
-                class="twofa-toggle ${user.is2FAEnabled ? 'disable' : 'enable'}">
-          ${user.is2FAEnabled ? '❌ Disable 2FA' : '✅ Enable 2FA'}
+                class="${user.is2FAEnabled ? 'disable' : 'enable'}">
+          ${user.is2FAEnabled ? '❌ '+i18next.t('disable2FA') : '✅ '+i18next.t('enable2FA')}
         </button>
       </div>
 
+      <!-- stats -->
       <div class="stats-section">
-        <h3 class="section-subtitle">🏆 Stats</h3>
-        <p>Wins: <span id="wins">--</span></p>
-        <p>Losses: <span id="losses">--</span></p>
+        <h3>🏆 ${i18next.t('stats')}</h3>
+        <p>${i18next.t('wins')}:   <span id="wins">--</span></p>
+        <p>${i18next.t('losses')}: <span id="losses">--</span></p>
       </div>
 
+      <!-- history -->
       <div class="match-history-section">
-        <h3 class="section-subtitle">📜 Match History</h3>
+        <h3>📜 ${i18next.t('matchHistory')}</h3>
         <ul id="matchHistoryList"></ul>
       </div>
 
+      <!-- friends -->
       <div class="friend-section">
-        <h3 class="section-subtitle">👥 Friends</h3>
+        <h3>👥 ${i18next.t('friends')}</h3>
         <ul id="friendList"></ul>
       </div>
 
+      <!-- add friend -->
       <div class="add-friend-section">
-        <h3 class="section-subtitle">➕ Add Friend</h3>
-        <input id="searchInput" placeholder="Enter name…">
-        <button id="searchBtn" class="secondary-btn">Search</button>
+        <h3>➕ ${i18next.t('addFriend')}</h3>
+        <input id="searchInput" placeholder="${i18next.t('enterName')}">
+        <button id="searchBtn">${i18next.t('search')}</button>
         <ul id="searchResults"></ul>
       </div>
 
+      <!-- incoming requests -->
       <div class="pending-section">
-        <h3 class="section-subtitle">🕓 Pending Requests</h3>
+        <h3>🕓 ${i18next.t('pendingRequests')}</h3>
         <ul id="pendingList"></ul>
       </div>
-    </div>
-  `;
+    </div>`;
 
   /* ---------- avatar preview ---------- */
   const avatarInput = container.querySelector('#avatarInput') as HTMLInputElement;

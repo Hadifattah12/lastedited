@@ -23,7 +23,7 @@ let opponentName = "…";
 let currentState: RemoteState | null = null;
 let canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D;
 const keys = { up: false, down: false };
-let controlsEnabled = false;           // ⬅️  gate key input
+let controlsEnabled = false;
 let frameId = 0, pageActive = false;
 
 /* ── helper: get opponent name ───────────────────────────────── */
@@ -36,6 +36,22 @@ function extractOpponent(pkt: any): string | undefined {
   );
 }
 
+/* ── Toast helper (local) ───────────────────────────────────── */
+let toastTimer: number | null = null;
+function showToast(message: string, type: "error" | "success" | "info" = "info", duration = 3000) {
+  const el = document.getElementById("toast");
+  if (!el) return;
+  el.textContent = message;
+  el.className = `toast toast--visible toast--${type}`;
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+    toastTimer = null;
+  }
+  toastTimer = window.setTimeout(() => {
+    el.classList.remove("toast--visible");
+  }, duration);
+}
+
 /* ── entry point ────────────────────────────────────────────── */
 export function renderRemoteGame(): HTMLElement {
   pageActive = true;
@@ -43,6 +59,9 @@ export function renderRemoteGame(): HTMLElement {
   const root = document.createElement("div");
   root.className = "home-wrapper";
   root.innerHTML = `
+    <!-- Toast (shared style from master.css assumed) -->
+    <div id="toast" class="toast" aria-live="polite" aria-atomic="true"></div>
+
     <div class="game-container">
       <div class="score-board">
         <span id="left-name">P1</span>&nbsp;<span id="left-score">0</span>
@@ -53,7 +72,7 @@ export function renderRemoteGame(): HTMLElement {
       <!-- overlay for the 3-second countdown -->
       <div id="overlay" class="game-overlay" style="display:none;">
         <div class="overlay-content">
-          <h2 id="ov-title">Get Ready</h2>
+          <h2 id="ov-title">${i18next.t("getReady") || "Get Ready"}</h2>
           <p id="ov-msg">3</p>
         </div>
       </div>
@@ -72,7 +91,7 @@ export function renderRemoteGame(): HTMLElement {
 
   connectWebSocket();
   addKeyboardListeners();
-  draw();                                   // start render loop
+  draw();      // start render loop
   return root;
 }
 
@@ -83,9 +102,14 @@ function connectWebSocket() {
   const url = `${wsBase()}://${location.hostname}:3000/?code=${code}&name=${encodeURIComponent(myName)}`;
   ws = new WebSocket(url);
 
+  ws.onopen = () => {
+    showToast(i18next.t("connected") || "Connected", "info", 1500);
+  };
+
   ws.onmessage = ({ data }) => {
     if (!pageActive) return;
-    const msg = JSON.parse(data);
+    let msg: any;
+    try { msg = JSON.parse(data); } catch { return; }
 
     switch (msg.type) {
       case "init": {
@@ -97,12 +121,11 @@ function connectWebSocket() {
         break;
       }
 
-      /* host sends this when both connected */
-      case "ready": {
+      case "ready": {          // host indicates both connected
         const opp = extractOpponent(msg);
         if (opp) opponentName = opp;
         updateNames();
-        startCountdown();                 // ⬅️  start the 3-s timer
+        startCountdown();
         break;
       }
 
@@ -111,23 +134,41 @@ function connectWebSocket() {
         updateScores();
         break;
 
-      case "gameOver":
-        alert(i18next.t("GAME_WIN_MESSAGE", { winner: msg.winner }));
+      case "gameOver": {
+        const winner = msg.winner;
+        if (winner) {
+          const template = i18next.t("gameOverWinner") || "Winner: {{winner}}";
+          showToast(template.replace("{{winner}}", winner), "success", 4500);
+        } else {
+          showToast(i18next.t("gameOver") || "Game Over", "info", 3000);
+        }
         break;
+      }
 
       default:
         console.warn("Unknown ws packet", msg);
     }
   };
 
-  ws.onclose = () => { if (pageActive) alert(i18next.t("playerLeft")); };
+  ws.onerror = () => {
+    if (pageActive) {
+      showToast(i18next.t("connectionError") || "Connection error", "error", 4000);
+    }
+  };
+
+  ws.onclose = () => {
+    if (pageActive) {
+      // If game ended naturally, a gameOver toast already fired; still show playerLeft fallback.
+      showToast(i18next.t("playerLeft") || "Opponent left the game", "error", 4000);
+    }
+  };
 }
 
 /* ── 3-second overlay/countdown ─────────────────────────────── */
 function startCountdown() {
-  controlsEnabled = false;          // freeze paddles until countdown ends
-  const ov   = document.getElementById("overlay")!;
-  const ovMsg= document.getElementById("ov-msg")!;
+  controlsEnabled = false;
+  const ov    = document.getElementById("overlay")!;
+  const ovMsg = document.getElementById("ov-msg")!;
   ov.style.display = "flex";
 
   let n = 3;
@@ -139,15 +180,16 @@ function startCountdown() {
     } else {
       clearInterval(tick);
       ov.style.display = "none";
-      controlsEnabled = true;       // allow input after 3 s
+      controlsEnabled = true;
+      showToast(i18next.t("go") || "Go!", "info", 1200);
     }
   }, 1000);
 }
 
 /* ── send paddle input to server ─────────────────────────────── */
 function sendInput() {
-  if (!controlsEnabled) return;     // ignore keys until countdown ends
-  if (ws?.readyState === 1) {
+  if (!controlsEnabled) return;
+  if (ws?.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ type:"input", up: keys.up, down: keys.down }));
   }
 }
@@ -166,7 +208,7 @@ function addKeyboardListeners(){
   document.addEventListener("keyup",   onKeyUp);
 }
 
-/* ── render loop (draws whatever state the server sends) ────── */
+/* ── render loop ─────────────────────────────────────────────── */
 function draw(){
   if (!pageActive) return;
   frameId = requestAnimationFrame(draw);
@@ -174,19 +216,26 @@ function draw(){
 
   ctx.clearRect(0,0,W,H);
   const g = ctx.createLinearGradient(0,0,0,H);
-  g.addColorStop(0,"#1a1a2e"); g.addColorStop(1,"#16213e");
-  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  g.addColorStop(0,"#1a1a2e");
+  g.addColorStop(1,"#16213e");
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,W,H);
 
   ctx.strokeStyle = "rgba(255,255,255,.3)";
   ctx.setLineDash([10,10]);
-  ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(W/2,0);
+  ctx.lineTo(W/2,H);
+  ctx.stroke();
   ctx.setLineDash([]);
 
+  // paddles
   ctx.fillStyle = "#00ff88";
   ctx.fillRect(currentState.leftPaddle.x, currentState.leftPaddle.y, P, PH);
   ctx.fillStyle = "#ff4757";
   ctx.fillRect(currentState.rightPaddle.x, currentState.rightPaddle.y, P, PH);
 
+  // ball
   ctx.fillStyle = "#fff";
   ctx.beginPath();
   ctx.arc(currentState.ball.x+B/2, currentState.ball.y+B/2, B/2, 0, Math.PI*2);
@@ -211,7 +260,8 @@ function updateScores(){
 function cleanup(){
   pageActive = false;
   cancelAnimationFrame(frameId);
-  ws?.close(); ws = null;
+  ws?.close();
+  ws = null;
   document.removeEventListener("keydown",onKeyDown);
   document.removeEventListener("keyup",onKeyUp);
   window.removeEventListener("hashchange", hashWatcher);

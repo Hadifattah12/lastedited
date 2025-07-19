@@ -6,23 +6,17 @@
 import '../styles/remote-setup.css';
 import i18next from 'i18next';
 
-/**
- * Host & guest both save two keys in localStorage:
- *   - remoteGameCode : the 6-char room code
- *   - user           : the existing user JSON (after login)
- *
- * remote-game.ts will read those and connect to
- *   wss://<host>:3000/?code=CODE&name=PlayerName
- */
-
 export function renderRemoteSetup(): HTMLElement {
   const container = document.createElement('div');
   container.className = 'remote-setup-wrapper';
 
   container.innerHTML = `
+    <!-- Toast -->
+    <div id="toast" class="toast" aria-live="polite" aria-atomic="true"></div>
+
     <div class="remote-setup-container">
-      <h1>${i18next.t('remotePlayer')}</h1>
-      <p>${i18next.t('chooseRemoteOption')}</p>
+      <h1>${i18next.t('remote Player')}</h1>
+      <p>${i18next.t('choose Remote Option')}</p>
 
       <div class="remote-buttons">
         <button id="generateBtn"  class="action-btn">🔑 ${i18next.t('generateCode')}</button>
@@ -31,7 +25,7 @@ export function renderRemoteSetup(): HTMLElement {
           <label>${i18next.t('yourGameCode')}:</label>
           <div class="code-display">
             <input id="generatedCode"  class="code-input" type="text" readonly>
-            <button id="copyBtn" class="copy-btn">📋</button>
+            <button id="copyBtn" class="copy-btn" aria-label="${i18next.t('copy')}">📋</button>
           </div>
           <button id="hostPlayBtn" class="start-game-btn" style="margin-top:12px;">🎮 ${i18next.t('startGame')}</button>
         </div>
@@ -45,12 +39,28 @@ export function renderRemoteSetup(): HTMLElement {
         <label for="joinCode">${i18next.t('enterGameCode')}:</label>
         <input id="joinCode" class="player-input"
                placeholder="${i18next.t('gameCode')}"
-               required minlength="6" maxlength="6">
+               required minlength="6" maxlength="6"
+               autocomplete="off" autocapitalize="characters" />
         <button class="start-game-btn" type="submit">🎮 ${i18next.t('joinGame')}</button>
       </form>
 
       <button id="backBtn" class="back-btn">⬅️ ${i18next.t('back')}</button>
     </div>`;
+
+  /* ----------------- Toast helper ----------------- */
+  let toastTimer: number | null = null;
+  function showToast(msg: string, type: 'error' | 'success' | 'info' = 'info', duration = 2500) {
+    const el = container.querySelector<HTMLDivElement>('#toast')!;
+    el.textContent = msg;
+    el.className = `toast toast--visible toast--${type}`;
+    if (toastTimer) {
+      clearTimeout(toastTimer);
+      toastTimer = null;
+    }
+    toastTimer = window.setTimeout(() => {
+      el.classList.remove('toast--visible');
+    }, duration);
+  }
 
   /* ----------------- element refs ----------------- */
   const generateBtn    = container.querySelector('#generateBtn')  as HTMLButtonElement;
@@ -70,20 +80,27 @@ export function renderRemoteSetup(): HTMLElement {
     generatedBlock.style.display = 'block';
     generateBtn.style.display    = 'none';
     localStorage.setItem('remoteGameCode', roomCode);
+    showToast(i18next.t('codeGenerated') || 'Code generated', 'success');
   });
 
   copyBtn.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(generatedInput.value);
       copyBtn.textContent = '✅';
-      setTimeout(() => (copyBtn.textContent = '📋'), 2000);
+      showToast(i18next.t('copied') || 'Copied!', 'info', 1500);
+      setTimeout(() => (copyBtn.textContent = '📋'), 1600);
     } catch {
-      generatedInput.select(); document.execCommand('copy');
+      generatedInput.select();
+      document.execCommand('copy');
+      showToast(i18next.t('copied') || 'Copied!', 'info', 1500);
     }
   });
 
   hostPlayBtn.addEventListener('click', () => {
-    if (generatedInput.value) location.hash = '/remote-game';
+    if (generatedInput.value) {
+      showToast(i18next.t('startingGame') || 'Starting…', 'info', 1200);
+      setTimeout(() => { location.hash = '/remote-game'; }, 500);
+    }
   });
 
   /* ----------------- guest flow ------------------- */
@@ -92,16 +109,26 @@ export function renderRemoteSetup(): HTMLElement {
     joinCodeInput.focus();
   });
 
+  joinCodeInput.addEventListener('input', () => {
+    joinCodeInput.value = joinCodeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  });
+
   joinForm.addEventListener('submit', e => {
     e.preventDefault();
     const code = joinCodeInput.value.trim().toUpperCase();
-    if (code.length !== 6) return alert(i18next.t('invalidCode'));
+    if (code.length !== 6) {
+      showToast(i18next.t('invalidCode') || 'Invalid code', 'error');
+      return;
+    }
     localStorage.setItem('remoteGameCode', code);
-    location.hash = '/remote-game';
+    showToast(i18next.t('joiningGame') || 'Joining…', 'info', 1200);
+    setTimeout(() => { location.hash = '/remote-game'; }, 400);
   });
 
   /* ----------------- misc ------------------------- */
-  backBtn.addEventListener('click', () => (location.hash = '/home'));
+  backBtn.addEventListener('click', () => {
+    location.hash = '/home';
+  });
 
   return container;
 }

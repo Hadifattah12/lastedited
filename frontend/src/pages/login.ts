@@ -234,7 +234,7 @@ export function renderLogin(): HTMLElement {
   /* ---------- Google OAuth ---------- */
   googleBtn.addEventListener('click', () => {
     showToast('Redirecting to Google…', 'info', 2500);
-    window.location.href = 'https://localhost:3000/api/auth/google';
+    window.location.href = 'https://c1r4s7.42beirut.com:3000/api/auth/google';
   });
 
   return container;

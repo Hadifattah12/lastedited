@@ -7,5 +7,5 @@ services:
     environment:
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
     volumes:
-      - ./backend/db:/app/backend/db     # <--- Add this line
+      - ./backend/db:/app/backend/db
     restart: unless-stopped

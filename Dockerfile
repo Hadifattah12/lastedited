@@ -6,7 +6,7 @@ COPY . .
 
 # Install frontend dependencies
 WORKDIR /app/frontend
-RUN npm install
+RUN npm install && npm install dotenv --save-dev
 
 # Install backend dependencies
 WORKDIR /app/backend

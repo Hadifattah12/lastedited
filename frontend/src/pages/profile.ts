@@ -3,6 +3,18 @@ import '../styles/profile.css';
 import { resolveAvatar } from '../utils/resolveAvatar';
 import { apiFetch } from '../utils/api';
 import i18next from 'i18next';
+
+// Import Chart.js - you'll need to install this
+import {
+  Chart,
+  registerables,
+  type ChartData,
+  type ChartOptions
+} from 'chart.js';
+
+// Register Chart.js components
+Chart.register(...registerables);
+
 /* ------------------------------------------------------------------ */
 /* helpers                                                            */
 /* ------------------------------------------------------------------ */
@@ -52,6 +64,74 @@ interface Friend {
   avatar: string;
   online: boolean;
 }
+
+interface MatchStats {
+  wins: number;
+  losses: number;
+  totalMatches: number;
+  winRate: number;
+  recentForm: ('W' | 'L')[];
+}
+
+/* ------------------------------------------------------------------ */
+/* Chart creation functions                                           */
+/* ------------------------------------------------------------------ */
+function createWinLossChart(canvas: HTMLCanvasElement, stats: MatchStats) {
+  const data: ChartData<'doughnut'> = {
+    labels: ['Wins', 'Losses'],
+    datasets: [{
+      data: [stats.wins, stats.losses],
+      backgroundColor: [
+        '#10B981', // Green for wins
+        '#EF4444'  // Red for losses
+      ],
+      borderColor: [
+        '#059669',
+        '#DC2626'
+      ],
+      borderWidth: 2,
+      hoverOffset: 10
+    }]
+  };
+
+  const options: ChartOptions<'doughnut'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          padding: 20,
+          font: {
+            size: 14,
+            weight: 'bold'
+          }
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context  ) {
+            const label = context.label || '';
+            const value = context.parsed;
+            const percentage = stats.totalMatches > 0 
+              ? ((value / stats.totalMatches) * 100).toFixed(1)
+              : '0';
+            return `${label}: ${value} (${percentage}%)`;
+          }
+        }
+      }
+    },
+    cutout: '60%'
+  };
+
+  return new Chart(canvas, {
+    type: 'doughnut',
+    data: data,
+    options: options
+  });
+}
+
+
 
 /* ------------------------------------------------------------------ */
 /* friend-profile popup                                               */
@@ -194,11 +274,34 @@ export async function renderProfile(): Promise<HTMLElement> {
         </button>
       </div>
 
-      <!-- stats -->
+      <!-- stats with charts -->
       <div class="stats-section">
         <h3>🏆 ${i18next.t('stats')}</h3>
-        <p>${i18next.t('wins')}:   <span id="wins">--</span></p>
-        <p>${i18next.t('losses')}: <span id="losses">--</span></p>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <h4>Win/Loss Ratio</h4>
+            <div class="chart-container">
+              <canvas id="winLossChart"></canvas>
+            </div>
+            <div class="stat-summary">
+              <div class="stat-item">
+                <span class="stat-label">Total Matches:</span>
+                <span id="totalMatches" class="stat-value">--</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Win Rate:</span>
+                <span id="winRate" class="stat-value">--</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="stat-card">
+            
+            <div class="form-legend">
+              
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- history -->
@@ -386,6 +489,10 @@ export async function renderProfile(): Promise<HTMLElement> {
     });
   }
 
+  // Store chart instances to clean them up when needed
+  let winLossChart: Chart | null = null;
+
+
   async function calcStats() {
     const r = await apiFetch(`/api/matches/${encodeURIComponent(user.name)}`);
     if (r.status === 401) return redirectToLogin();
@@ -394,12 +501,46 @@ export async function renderProfile(): Promise<HTMLElement> {
 
     let wins = 0;
     let losses = 0;
+    const recentForm: ('W' | 'L')[] = [];
+    
+    // Process matches to calculate stats
     arr.forEach((m) => {
-      if (m.winner === user.name) wins++;
-      else if (m.player1 === user.name || m.player2 === user.name) losses++;
+      const win = m.winner === user.name;
+      if (win) {
+        wins++;
+        recentForm.push('W');
+      } else if (m.player1 === user.name || m.player2 === user.name) {
+        losses++;
+        recentForm.push('L');
+      }
     });
-    (container.querySelector('#wins') as HTMLElement).textContent = String(wins);
-    (container.querySelector('#losses') as HTMLElement).textContent = String(losses);
+
+    const totalMatches = wins + losses;
+    const winRate = totalMatches > 0 ? ((wins / totalMatches) * 100) : 0;
+
+    const stats: MatchStats = {
+      wins,
+      losses,
+      totalMatches,
+      winRate,
+      recentForm: recentForm.reverse() // Most recent first
+    };
+
+    // Update summary displays
+    (container.querySelector('#totalMatches') as HTMLElement).textContent = String(totalMatches);
+    (container.querySelector('#winRate') as HTMLElement).textContent = `${winRate.toFixed(1)}%`;
+
+    // Clean up existing charts
+    if (winLossChart) {
+      winLossChart.destroy();
+    }
+    
+    // Create new charts
+    const winLossCanvas = container.querySelector('#winLossChart') as HTMLCanvasElement;
+    
+    if (winLossCanvas) {
+      winLossChart = createWinLossChart(winLossCanvas, stats);
+    }
   }
 
   /* ---------- friend search ---------- */
@@ -452,7 +593,7 @@ export async function renderProfile(): Promise<HTMLElement> {
 
   /* ---------- initial parallel loads ---------- */
   await Promise.all([loadFriends(), loadPendingRequests(), loadMatchHistory()]);
-  setTimeout(calcStats, 0);
+  setTimeout(calcStats, 100); // Small delay to ensure DOM is ready
 
   return container;
 }

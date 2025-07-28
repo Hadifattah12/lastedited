@@ -49,16 +49,16 @@ const fastifyStatic = require('@fastify/static');
 const multipart     = require('@fastify/multipart');
 
 fastify.register(fastifyCors, {
-  origin: [
+    origin: [
     `https://${myIP}:5173`,
     `http://${myIP}:5173`,
-    `https://c1r4s7.42beirut.com:5173`,
-    `http://c1r4s7.42beirut.com:5173`,
+    ...process.env.CORS_42_ORIGINS?.split(',') || [],
     'https://localhost:5173',
     'http://localhost:5173',
     'https://127.0.0.1:5173',
     'http://127.0.0.1:5173'
   ],
+
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']

@@ -18,8 +18,8 @@ cd /app/frontend && npm run dev &
 # Wait a bit to let backend start
 sleep 5
 
-echo "🌐 Starting ngrok tunnel on https://c1r4s7.42beirut.com:3000 ..."
-ngrok http https://c1r4s7.42beirut.com:3000 --log=stdout > /tmp/ngrok.log &
+echo "🌐 Starting ngrok tunnel on $PUBLIC_URL ..."
+ngrok http "$PUBLIC_URL" --log=stdout > /tmp/ngrok.log &
 
 # Keep container alive
 tail -f /dev/null
